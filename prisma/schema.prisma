@@ -1,0 +1,139 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Users (customers and admins)
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String    // hashed
+  name          String?
+  role          UserRole  @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+  cartItems     CartItem[]
+  reviews       Review[]
+  newsletterSub NewsletterSubscriber?
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+// Categories for products
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  slug        String    @unique   // e.g., "coloring-books" for SEO
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products    Product[]
+}
+
+// Products (coloring books, toys, etc.)
+model Product {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique   // for SEO-friendly URLs
+  description String
+  price       Float     @default(0)
+  stock       Int       @default(0)
+  images      String[]  // array of image URLs
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  reviews     Review[]
+}
+
+// Shopping cart items (before checkout)
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId]) // one cart item per user per product
+}
+
+// Orders (after checkout)
+model Order {
+  id          Int       @id @default(autoincrement())
+  orderNumber String    @unique
+  status      OrderStatus @default(PENDING)
+  total       Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+
+  items       OrderItem[]
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// Individual items in an order
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  quantity  Int
+  price     Float    // price at time of purchase
+  createdAt DateTime @default(now())
+
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+// Product reviews
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId]) // one review per user per product
+}
+
+// Newsletter subscribers
+model NewsletterSubscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  userId    Int?     @unique // if registered user subscribes, link to their account
+  user      User?    @relation(fields: [userId], references: [id])
+}
